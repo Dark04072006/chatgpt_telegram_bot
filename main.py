@@ -1,22 +1,17 @@
 """Основной файл в котором проходит инициализация бота"""
 
 import os
-import asyncio
 import dotenv
 import logging
 from aiogram import Bot, Dispatcher
 from aiogram.types import BotCommand
 from bot.handlers import router
 from bot.middlewares.subscribe import SubscribeMiddleware
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiohttp import web
 
 
-async def main():
-    """Инициализация всех компонентов бота"""
-    logging.basicConfig(level=logging.INFO)
-
-    dotenv.load_dotenv(".env")
-
-    bot = Bot(token=os.getenv("TELEGRAM_API_TOKEN"))
+async def on_startup(bot: Bot) -> None:
     await bot.set_my_commands(
         [
             BotCommand(command="start", description="Запуск бота"),
@@ -24,17 +19,37 @@ async def main():
             BotCommand(command="help", description="Помощь"),
         ]
     )
+    await bot.delete_webhook(drop_pending_updates=True)
+    await bot.set_webhook(
+        url="https://5fb5-188-170-199-123.ngrok-free.app/webhook",
+    )
+
+
+def main():
+    """Инициализация всех компонентов бота"""
+
+    dotenv.load_dotenv(".env")
+
     dispatcher = Dispatcher()
 
-    dispatcher.message.middleware(SubscribeMiddleware())
+    dispatcher.startup.register(on_startup)
     dispatcher.include_router(router)
+    dispatcher.message.middleware(SubscribeMiddleware())
 
-    await bot.delete_webhook(drop_pending_updates=True)
+    app = web.Application()
 
-    await dispatcher.start_polling(bot)
+    bot = Bot(token=os.getenv("TELEGRAM_API_TOKEN"))
+
+    SimpleRequestHandler(
+        dispatcher=dispatcher,
+        bot=bot,
+    ).register(app, path="/webhook")
+
+    setup_application(app, dispatcher, bot=bot)
+
+    web.run_app(app, host="0.0.0.0", port=8000)
 
 
 if __name__ == "__main__":
-    loop = asyncio.new_event_loop()
-    loop.run_until_complete(main())
-    loop.close()
+    logging.basicConfig(level=logging.INFO)
+    main()

@@ -1,4 +1,5 @@
 import openai
+import json
 
 
 class Singleton(type):
@@ -27,6 +28,13 @@ class ChatGPT:
         self.api_key = api_key
         self.sessions = {}
 
+        # Загрузка существующих сессий из файла sessions.json
+        try:
+            with open("sessions.json", "r", encoding="utf-8") as file:
+                self.sessions = json.load(file)
+        except FileNotFoundError:
+            pass
+
     def create_session(self, session_id: int) -> None:
         """
         Создает новую сессию для взаимодействия с ChatGPT.
@@ -35,6 +43,8 @@ class ChatGPT:
             session_id (int): Идентификатор сессии.
         """
         self.sessions[session_id] = {"messages": []}
+        with open("sessions.json", "w", encoding="utf-8") as file:
+            json.dump(self.sessions, file, indent=2, ensure_ascii=False)
 
     def update_messages(self, role: str, content: str, session_id: int) -> None:
         """
@@ -49,6 +59,8 @@ class ChatGPT:
         if session_id not in self.sessions:
             self.create_session(session_id)
         self.sessions[session_id]["messages"].append({"role": role, "content": content})
+        with open("sessions.json", "w", encoding="utf-8") as file:
+            json.dump(self.sessions, file, ensure_ascii=False, indent=2)
 
     def create_completion(self, content: str, session_id: int) -> str:
         """
@@ -82,6 +94,8 @@ class ChatGPT:
         """
         if session_id in self.sessions:
             self.sessions[session_id]["messages"] = []
+            with open("sessions.json", "w", encoding="utf-8") as file:
+                json.dump(self.sessions, file, ensure_ascii=False, indent=2)
 
     def change_default_message_settings(self, content: str, session_id: int) -> None:
         """
@@ -92,3 +106,5 @@ class ChatGPT:
             session_id (int): Идентификатор сессии.
         """
         self.update_messages("system", content, session_id)
+        with open("sessions.json", "w", encoding="utf-8") as file:
+            json.dump(self.sessions, file, ensure_ascii=False, indent=2)
