@@ -2,26 +2,22 @@
 Модуль хэндлеров
 """
 import os
+import random
+from datetime import timedelta
 import dotenv
 
 from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, ChatPermissions
 
 from bot.chatgpt import ChatGPT
+from bot.filters import GroupCommandFilter
+
 
 dotenv.load_dotenv(".env")
 
 router = Router()
 chatgpt = ChatGPT(os.getenv("OPENAI_API_TOKEN"))
-
-
-def group_command_filter(message: Message, command: str) -> bool:
-    """Фильтр сообщений в группе"""
-    return message.text.startswith(command) and message.chat.type in (
-        "group",
-        "supergroup",
-    )
 
 
 @router.message(Command("start"))
@@ -47,7 +43,7 @@ async def text_handler(message: Message) -> None:
     )
 
 
-@router.message(lambda message: group_command_filter(message, "/gpt"))
+@router.message(GroupCommandFilter("/gpt"))
 async def group_message_handler(message: Message) -> None:
     """Обработчик команды /gpt в группе"""
     message_ = await message.reply("Обработка запроса...")
@@ -56,9 +52,53 @@ async def group_message_handler(message: Message) -> None:
     await message_.edit_text(response)
 
 
-@router.message(lambda message: group_command_filter(message, "/set"))
+@router.message(GroupCommandFilter("/set"))
 async def set_chatgpt_settings_handler(message: Message) -> None:
     """Смена настроек ИИ"""
     text = message.text.strip("/set").strip()
     chatgpt.change_default_message_settings(text, str(message.from_user.id))
     await message.reply("Стандартная настройка изменена.")
+
+
+@router.message(GroupCommandFilter("/mute", admin=True))
+async def mute_user_handler(message: Message) -> None:
+    """Функция мута пользователя"""
+    try:
+        user_id = message.reply_to_message.from_user.id
+        mute_time = int(message.text.split()[1])
+        await message.bot.restrict_chat_member(
+            message.chat.id,
+            user_id,
+            ChatPermissions(can_send_messages=False),
+            until_date=timedelta(hours=mute_time),
+        )
+
+        await message.reply(
+            f"Пользователю: {message.reply_to_message.from_user.full_name}"
+            + " "
+            + "ограничена отправка сообщений на "
+            + str(mute_time)
+            + " часов"
+        )
+
+    except AttributeError:
+        await message.reply("Эта команда должна быть ответом на сообщение.")
+
+
+@router.message(GroupCommandFilter("!инфа"))
+async def random_value_handler(message: Message) -> None:
+    """Обработчик команды !инфо"""
+    await message.reply(
+        f"{message.from_user.full_name}, вероятность составляет - {random.randint(1, 100)}%"
+    )
+
+
+@router.message(Command("help"))
+async def help_command_handler(message: Message) -> None:
+    """Обработчик списка команд"""
+    await message.reply(
+        "Список команд:\n"
+        + "/start - запуск бота\n"
+        + "/clean - очистить сессию ИИ\n"
+        + "Команды для групп:\ngpt {ваш запрос к ИИ}\nset {ваша настройка ИИ}\n!инфо {ваше условие}"
+    )
