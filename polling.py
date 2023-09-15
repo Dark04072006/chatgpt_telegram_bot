@@ -1,10 +1,9 @@
-"""Основной файл в котором проходит инициализация бота"""
+"""файл в котором проходит инициализация бота и запуск поллинга"""
 
 import os
+import asyncio
 import logging
 import dotenv
-from aiohttp import web
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiogram import Bot, Dispatcher
 from aiogram.types import BotCommand
 from bot.handlers import router
@@ -21,10 +20,9 @@ async def on_startup(bot: Bot) -> None:
         ]
     )
     await bot.delete_webhook(drop_pending_updates=True)
-    await bot.set_webhook(url=os.getenv("WEBHOOK_URL") + "/webhook")
 
 
-def main():
+async def main() -> None:
     """Инициализация всех компонентов бота"""
 
     dotenv.load_dotenv(".env")
@@ -35,20 +33,13 @@ def main():
     dispatcher.include_router(router)
     dispatcher.message.middleware(SubscribeMiddleware())
 
-    app = web.Application()
-
     bot = Bot(token=os.getenv("TELEGRAM_API_TOKEN"))
 
-    SimpleRequestHandler(
-        dispatcher=dispatcher,
-        bot=bot,
-    ).register(app, path="/webhook")
-
-    setup_application(app, dispatcher, bot=bot)
-
-    web.run_app(app)
+    await dispatcher.start_polling(bot)
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    main()
+    loop = asyncio.new_event_loop()
+    loop.run_until_complete(main())
+    loop.close()

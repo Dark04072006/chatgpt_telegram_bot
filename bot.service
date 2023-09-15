@@ -1,0 +1,7 @@
+[Service]
+WorkingDirectory= /var/www/webhook111ru/webhook/chatgpt/
+User=root
+ExecStart=/usr/bin/python3 /var/www/webhook111ru/webhook/chatgpt/main.py
+
+[Install]
+WantedBy=multi-user.target
